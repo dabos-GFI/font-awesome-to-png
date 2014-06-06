@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 
 #
 # font-awesome-to-png.py
@@ -553,43 +553,57 @@ class ListUpdateAction(argparse.Action):
         exit(0)
 
 
-def export_icon(icon, size, filename, font, color):
-    image = Image.new("RGBA", (size, size), color=(0,0,0,0))
+def export_icon(icon, argWidth, argHeight, filename, font, fontSize, color):
+    iconWidth = 1024
+    if argWidth != "auto":
+        iconWidth = int(argWidth)
+      
+    iconHeight = 1024
+    if argHeight != "auto":
+        iconHeight = int(argHeight)
+    
+    image = Image.new("RGBA", (iconWidth, iconHeight), color=(0,0,0,0))
 
     draw = ImageDraw.Draw(image)
 
     # Initialize font
-    font = ImageFont.truetype(font, size)
+    font = ImageFont.truetype(font, fontSize)
 
     # Determine the dimensions of the icon
     width,height = draw.textsize(icons[icon], font=font)
+    
+    if argWidth == "auto":
+        iconWidth = width + 2
 
-    draw.text(((size - width) / 2, (size - height) / 2), icons[icon],
+    if argHeight == "auto":
+        iconHeight = height + 2
+
+    draw.text(((iconWidth - width) / 2, (iconHeight - height) / 2), icons[icon],
             font=font, fill=color)
 
     # Get bounding box
     bbox = image.getbbox()
 
     # Create an alpha mask
-    imagemask = Image.new("L", (size, size), 0)
+    imagemask = Image.new("L", (iconWidth, iconHeight), 0)
     drawmask = ImageDraw.Draw(imagemask)
 
     # Draw the icon on the mask
-    drawmask.text(((size - width) / 2, (size - height) / 2), icons[icon],
+    drawmask.text(((iconWidth - width) / 2, (iconHeight - height) / 2), icons[icon],
         font=font, fill=255)
 
     # Create a solid color image and apply the mask
-    iconimage = Image.new("RGBA", (size,size), color)
+    iconimage = Image.new("RGBA", (iconWidth,iconHeight), color)
     iconimage.putalpha(imagemask)
 
     if bbox:
         iconimage = iconimage.crop(bbox)
 
-    borderw = int((size - (bbox[2] - bbox[0])) / 2)
-    borderh = int((size - (bbox[3] - bbox[1])) / 2)
+    borderw = int((iconWidth - (bbox[2] - bbox[0])) / 2)
+    borderh = int((iconHeight - (bbox[3] - bbox[1])) / 2)
 
     # Create output image
-    outimage = Image.new("RGBA", (size, size), (0,0,0,0))
+    outimage = Image.new("RGBA", (iconWidth, iconHeight), (0,0,0,0))
     outimage.paste(iconimage, (borderw,borderh))
 
     # Save file
@@ -607,7 +621,7 @@ class LoadCSSAction(argparse.Action):
         new_icons = {}
         parser = tinycss.make_parser("page3")
         stylesheet = parser.parse_stylesheet_file(filename)
-        is_icon = re.compile(u("\.fa-(.*):before,?"))
+        is_icon = re.compile(u("\.(.*):before,?"))
         for rule in stylesheet.rules:
             selector = rule.selector.as_css()
             for match in is_icon.finditer(selector):
@@ -642,13 +656,19 @@ if __name__ == '__main__':
     parser.add_argument("--list-update", nargs=0, action=ListUpdateAction,
             help=argparse.SUPPRESS)
     parser.add_argument("--size", type=int, default=16,
-            help="Icon size in pixels (default: 16)")
+            help="Font size in pixels (default: 16)")
+    parser.add_argument("--width", type=str, default="auto",
+            help="Icon width in pixels (default: 16)")
+    parser.add_argument("--height", type=str, default="auto",
+            help="Icon heigth in pixels (default: 16)")
 
     args = parser.parse_args()
     icon = args.icon
-    size = args.size
+    fontSize = args.size
     font = args.font
     color = args.color
+    iconWidth = args.width
+    iconHeight = args.height
 
     if args.font:
         if not path.isfile(args.font) or not access(args.font, R_OK):
@@ -677,15 +697,12 @@ if __name__ == '__main__':
     for icon in selected_icons:
         if len(selected_icons) > 1:
             # Exporting multiple icons -- treat the filename option as name prefix
-            filename = (args.filename or "") + icon + ".png"
+            filename = (args.filename or (iconWidth + "X" + iconHeight + "_" + color[1:] + "_")) + icon + ".png"
         else:
             # Exporting one icon
-            if args.filename:
-                filename = args.filename
-            else:
-                filename = icon + ".png"
+            filename = (args.filename or (iconWidth + "X" + iconHeight + "_" + color[1:] + "_")) + icon + ".png"
 
-        print("Exporting icon \"%s\" as %s (%ix%i pixels)" %
-                (icon, filename, size, size))
+        print("Exporting icon \"%s\" as %s (%s x %s pixels)" %
+                (icon, filename, iconWidth, iconHeight))
 
-        export_icon(icon, size, filename, font, color)
+        export_icon(icon, iconWidth, iconHeight, filename, font, fontSize, color)
